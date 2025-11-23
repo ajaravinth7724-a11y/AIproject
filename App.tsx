@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-route
 import { ParsedResume, SuggestedRole, AppStep, LearningResource, QuizQuestion, JobListing } from './types';
 import { parseResumeDocument, generateLearningPath, generateQuiz, generateAptitudePrep, generateFullMockTest, searchJobs } from './services/geminiService';
 import { useLiveInterview } from './hooks/useLiveInterview';
-import { Upload, FileText, CheckCircle, BookOpen, Briefcase, Mic, ChevronRight, Play, Search, Award, Brain, Target, Camera, Hexagon, Save, Trash2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle, BookOpen, Briefcase, Mic, ChevronRight, Play, Search, Award, Brain, Target, Camera, Hexagon, Save, Trash2, Loader2 } from 'lucide-react';
 
 // --- Context ---
 interface AppContextType {
@@ -652,7 +652,7 @@ const FullMockPage = () => {
 const InterviewPage = () => {
   const { targetRole } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { connect, disconnect, isConnected, isSpeaking, error, logs } = useLiveInterview(targetRole?.title || 'General', videoRef);
+  const { connect, disconnect, isConnected, isConnecting, isSpeaking, error, logs } = useLiveInterview(targetRole?.title || 'General', videoRef);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -678,10 +678,12 @@ const InterviewPage = () => {
               </div>
               <div className="flex-1">
                  <p className="text-sm font-bold text-white">AI Interviewer</p>
-                 <p className="text-xs text-white/60 font-medium">{isSpeaking ? 'Speaking...' : isConnected ? 'Listening...' : 'Ready to connect'}</p>
+                 <p className="text-xs text-white/60 font-medium">{isSpeaking ? 'Speaking...' : isConnected ? 'Listening...' : isConnecting ? 'Connecting...' : 'Ready to connect'}</p>
               </div>
               {!isConnected ? (
-                <Button onClick={connect} variant="success" className="text-sm py-2 px-6 rounded-full shadow-lg shadow-emerald-500/20">Start Interview</Button>
+                <Button onClick={connect} disabled={isConnecting} variant="success" className="text-sm py-2 px-6 rounded-full shadow-lg shadow-emerald-500/20">
+                    {isConnecting ? <Loader2 className="w-4 h-4 animate-spin"/> : "Start Interview"}
+                </Button>
               ) : (
                 <Button onClick={disconnect} variant="danger" className="text-sm py-2 px-6 rounded-full shadow-lg shadow-red-500/20">End Call</Button>
               )}

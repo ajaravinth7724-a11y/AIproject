@@ -24,6 +24,7 @@ const base64ToUint8Array = (base64: string) => {
 
 export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVideoElement | null>) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -31,14 +32,17 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const sessionRef = useRef<any>(null);
+  const sessionRef = useRef<Promise<any> | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const videoIntervalRef = useRef<number | null>(null);
 
   const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
 
   const connect = useCallback(async () => {
+    if (isConnected || isConnecting) return;
+
     try {
+      setIsConnecting(true);
       setError(null);
       const apiKey = process.env.API_KEY;
       if (!apiKey) throw new Error("API Key missing");
@@ -73,6 +77,7 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
         callbacks: {
           onopen: () => {
             setIsConnected(true);
+            setIsConnecting(false);
             addLog("Connected to Interviewer");
             
             // 1. Stream Audio
@@ -150,12 +155,14 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
           },
           onclose: () => {
             setIsConnected(false);
+            setIsConnecting(false);
             addLog("Connection closed");
           },
           onerror: (err) => {
             console.error(err);
             setError("Connection error occurred");
             setIsConnected(false);
+            setIsConnecting(false);
           }
         },
         config: {
@@ -176,8 +183,9 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
     } catch (err: any) {
       setError(err.message);
       setIsConnected(false);
+      setIsConnecting(false);
     }
-  }, [role, videoRef]);
+  }, [role, videoRef, isConnected, isConnecting]);
 
   const disconnect = useCallback(() => {
     if (inputSourceRef.current) inputSourceRef.current.disconnect();
@@ -185,6 +193,18 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
     if (audioContextRef.current) audioContextRef.current.close();
     if (videoIntervalRef.current) window.clearInterval(videoIntervalRef.current);
     
+    // Close session
+    if (sessionRef.current) {
+      sessionRef.current.then(session => {
+        try {
+          session.close();
+        } catch (e) {
+          console.error("Error closing session:", e);
+        }
+      });
+      sessionRef.current = null;
+    }
+
     // Stop tracks
     if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -193,6 +213,7 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
     }
 
     setIsConnected(false);
+    setIsConnecting(false);
     setIsSpeaking(false);
     nextStartTimeRef.current = 0;
   }, [videoRef]);
@@ -201,5 +222,5 @@ export const useLiveInterview = (role: string, videoRef: React.RefObject<HTMLVid
     return () => disconnect();
   }, [disconnect]);
 
-  return { connect, disconnect, isConnected, isSpeaking, error, logs };
+  return { connect, disconnect, isConnected, isConnecting, isSpeaking, error, logs };
 };
